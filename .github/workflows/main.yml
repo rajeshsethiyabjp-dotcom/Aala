@@ -10,19 +10,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract zip
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Extract zip and Prepare Project
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-      - name: Build APK
+          flutter create . --platforms=android
+          flutter pub get
+
+      - name: Build Release APK
         run: |
           cd restaurant_lan_3in1
-          flutter pub get
           flutter build apk --release
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: restaurant-app-apk
           path: restaurant_lan_3in1/build/app/outputs/flutter-apk/app-release.apk
