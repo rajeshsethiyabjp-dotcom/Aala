@@ -46,6 +46,10 @@ jobs:
           c = c.replace('BonsoirDiscoveryServiceFoundEvent', 'BonsoirDiscoveryEvent')
           c = c.replace('service.resolve(_discovery!.serviceResolver)', 'service?.resolve(_discovery!.serviceResolver)')
           c = c.replace('_discovery!.eventStream.listen', '_discovery!.eventStream!.listen')
+          c = c.replace('final host = service.host;', 'final host = (service as dynamic)?.host ?? \"127.0.0.1\";')
+          c = c.replace('final p = service.port;', 'final p = (service as dynamic)?.port ?? 8080;')
+          c = c.replace('service.host', '((service as dynamic)?.host ?? \"127.0.0.1\")')
+          c = c.replace('service.port', '((service as dynamic)?.port ?? 8080)')
           with open(p, 'w') as f:
               f.write(c)
           "
@@ -78,4 +82,3 @@ jobs:
             Restaurant_Billing.apk
             Restaurant_Waiter.apk
             Restaurant_Kitchen.apk
-            
