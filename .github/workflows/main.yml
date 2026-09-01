@@ -22,93 +22,33 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Project, Overwrite Network Manager & Fix Permissions
+      - name: Prepare Android Scaffold, Patch Bonsoir & Add Permissions
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
           
-          # Android Project Generate
+          # 1. Android Project Scaffolding
           flutter create --platforms=android --org com.restaurant.lan .
           
-          # Android Permissions for Local LAN & Multicast
+          # 2. Add LAN / Multicast / Wi-Fi Permissions
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>' android/app/src/main/AndroidManifest.xml
           
-          # Overwrite network_manager.dart with 100% Bonsoir 5.x compatible code
-          cat << 'EOF' > lib/services/network_manager.dart
-          import 'dart:async';
-          import 'dart:io';
-          import 'package:flutter/foundation.dart';
-          import 'package:bonsoir/bonsoir.dart';
-
-          class NetworkManager extends ChangeNotifier {
-            BonsoirBroadcast? _broadcast;
-            BonsoirDiscovery? _discovery;
-            final String type = '_restaurant-lan._tcp';
-            final int port = 8080;
-
-            bool _isBroadcasting = false;
-            bool _isDiscovering = false;
-
-            bool get isBroadcasting => _isBroadcasting;
-            bool get isDiscovering => _isDiscovering;
-
-            Future<void> startBroadcast({required String name}) async {
-              try {
-                BonsoirService service = BonsoirService(
-                  name: name,
-                  type: type,
-                  port: port,
-                );
-                _broadcast = BonsoirBroadcast(service: service);
-                await _broadcast!.ready;
-                await _broadcast!.start();
-                _isBroadcasting = true;
-                notifyListeners();
-              } catch (e) {
-                debugPrint('Broadcast Error: \$e');
-              }
-            }
-
-            Future<void> stopBroadcast() async {
-              if (_broadcast != null) {
-                await _broadcast!.stop();
-                _isBroadcasting = false;
-                notifyListeners();
-              }
-            }
-
-            Future<void> startDiscovery({required Function(String host, int port) onServiceFound}) async {
-              try {
-                _discovery = BonsoirDiscovery(type: type);
-                await _discovery!.ready;
-                _discovery!.eventStream?.listen((event) {
-                  if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-                    event.service?.resolve(_discovery!.serviceResolver);
-                  } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
-                    final resolvedService = event.service;
-                    if (resolvedService != null) {
-                      String? host = resolvedService.attributes['host'] ?? '127.0.0.1';
-                      onServiceFound(host, resolvedService.port);
-                    }
-                  }
-                });
-                await _discovery!.start();
-                _isDiscovering = true;
-                notifyListeners();
-              } catch (e) {
-                debugPrint('Discovery Error: \$e');
-              }
-            }
-
-            Future<void> stopDiscovery() async {
-              if (_discovery != null) {
-                await _discovery!.stop();
-                _isDiscovering = false;
-                notifyListeners();
-              }
-            }
-          }
-          EOF
+          # 3. Patch Bonsoir 5.x API incompatibilities safely
+          python3 -c "
+          p = 'lib/services/network_manager.dart'
+          with open(p, 'r') as f:
+              c = f.read()
+          c = c.replace('await _broadcast!.initialize();', 'await _broadcast!.ready;')
+          c = c.replace('await _discovery!.initialize();', 'await _discovery!.ready;')
+          c = c.replace('event is BonsoirDiscoveryServiceResolvedEvent', 'event.type == BonsoirDiscoveryEventType.discoveryServiceResolved')
+          c = c.replace('event is BonsoirDiscoveryServiceFoundEvent', 'event.type == BonsoirDiscoveryEventType.discoveryServiceFound')
+          c = c.replace('BonsoirDiscoveryServiceResolvedEvent', 'BonsoirDiscoveryEvent')
+          c = c.replace('BonsoirDiscoveryServiceFoundEvent', 'BonsoirDiscoveryEvent')
+          c = c.replace('service.resolve(_discovery!.serviceResolver)', 'service?.resolve(_discovery!.serviceResolver)')
+          c = c.replace('_discovery!.eventStream.listen', '_discovery!.eventStream!.listen')
+          with open(p, 'w') as f:
+              f.write(c)
+          "
           
           flutter pub get
 
