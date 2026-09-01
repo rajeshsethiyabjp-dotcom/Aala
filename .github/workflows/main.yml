@@ -22,13 +22,15 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Project and Build APK
+      - name: Fix Dependencies and Build APK
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
           flutter create . --platforms=android
+          # Fix bonsoir dependency lock
+          flutter pub add bonsoir:^2.10.0
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
