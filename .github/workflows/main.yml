@@ -27,20 +27,21 @@ jobs:
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
           
-          # 1. Android Native Project Generate
+          # Android Project Generate
           flutter create --platforms=android --org com.restaurant.lan .
           
-          # 2. Add LAN / Multicast / Wi-Fi Permissions
+          # Add LAN Permissions
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>' android/app/src/main/AndroidManifest.xml
           
-          # 3. Patch bonsoir breaking API mismatches in code
-          sed -i 's/await _broadcast!\.initialize();/await _broadcast!.ready;/g' lib/services/network_manager.dart || true
-          sed -i 's/await _discovery!\.initialize();/await _discovery!.ready;/g' lib/services/network_manager.dart || true
-          sed -i 's/is BonsoirDiscoveryServiceResolvedEvent/is BonsoirServiceResolvedEvent/g' lib/services/network_manager.dart || true
-          sed -i 's/BonsoirDiscoveryServiceResolvedEvent/BonsoirServiceResolvedEvent/g' lib/services/network_manager.dart || true
-          sed -i 's/BonsoirDiscoveryEvent/BonsoirEvent/g' lib/services/network_manager.dart || true
+          # FIX DEVELOPER'S BROKEN CODE (Patching for bonsoir 5.1.0)
+          sed -i 's/event is BonsoirDiscoveryServiceFoundEvent/event.type == BonsoirDiscoveryEventType.discoveryServiceFound/g' lib/services/network_manager.dart || true
+          sed -i 's/event is BonsoirServiceResolvedEvent/event.type == BonsoirDiscoveryEventType.discoveryServiceResolved/g' lib/services/network_manager.dart || true
+          sed -i 's/BonsoirDiscoveryServiceFoundEvent/BonsoirDiscoveryEvent/g' lib/services/network_manager.dart || true
+          sed -i 's/BonsoirServiceResolvedEvent/BonsoirDiscoveryEvent/g' lib/services/network_manager.dart || true
+          sed -i 's/eventStream\.listen/eventStream!.listen/g' lib/services/network_manager.dart || true
+          sed -i 's/await _broadcast!.initialize()/await _broadcast!.ready/g' lib/services/network_manager.dart || true
+          sed -i 's/await _discovery!.initialize()/await _discovery!.ready/g' lib/services/network_manager.dart || true
           
-          # 4. Pub dependencies
           flutter pub get
 
       - name: Build Billing APK
