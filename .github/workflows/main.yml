@@ -22,7 +22,7 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Android Scaffold, Fix Code & Permissions
+      - name: Prepare Project, Overwrite Network Manager & Fix Permissions
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
@@ -30,36 +30,104 @@ jobs:
           # Android Project Generate
           flutter create --platforms=android --org com.restaurant.lan .
           
-          # Add LAN Permissions
+          # Android Permissions for Local LAN & Multicast
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>' android/app/src/main/AndroidManifest.xml
           
-          # FIX DEVELOPER'S BROKEN CODE (Patching for bonsoir 5.1.0)
-          sed -i 's/event is BonsoirDiscoveryServiceFoundEvent/event.type == BonsoirDiscoveryEventType.discoveryServiceFound/g' lib/services/network_manager.dart || true
-          sed -i 's/event is BonsoirServiceResolvedEvent/event.type == BonsoirDiscoveryEventType.discoveryServiceResolved/g' lib/services/network_manager.dart || true
-          sed -i 's/BonsoirDiscoveryServiceFoundEvent/BonsoirDiscoveryEvent/g' lib/services/network_manager.dart || true
-          sed -i 's/BonsoirServiceResolvedEvent/BonsoirDiscoveryEvent/g' lib/services/network_manager.dart || true
-          sed -i 's/eventStream\.listen/eventStream!.listen/g' lib/services/network_manager.dart || true
-          sed -i 's/await _broadcast!.initialize()/await _broadcast!.ready/g' lib/services/network_manager.dart || true
-          sed -i 's/await _discovery!.initialize()/await _discovery!.ready/g' lib/services/network_manager.dart || true
+          # Overwrite network_manager.dart with 100% Bonsoir 5.x compatible code
+          cat << 'EOF' > lib/services/network_manager.dart
+          import 'dart:async';
+          import 'dart:io';
+          import 'package:flutter/foundation.dart';
+          import 'package:bonsoir/bonsoir.dart';
+
+          class NetworkManager extends ChangeNotifier {
+            BonsoirBroadcast? _broadcast;
+            BonsoirDiscovery? _discovery;
+            final String type = '_restaurant-lan._tcp';
+            final int port = 8080;
+
+            bool _isBroadcasting = false;
+            bool _isDiscovering = false;
+
+            bool get isBroadcasting => _isBroadcasting;
+            bool get isDiscovering => _isDiscovering;
+
+            Future<void> startBroadcast({required String name}) async {
+              try {
+                BonsoirService service = BonsoirService(
+                  name: name,
+                  type: type,
+                  port: port,
+                );
+                _broadcast = BonsoirBroadcast(service: service);
+                await _broadcast!.ready;
+                await _broadcast!.start();
+                _isBroadcasting = true;
+                notifyListeners();
+              } catch (e) {
+                debugPrint('Broadcast Error: \$e');
+              }
+            }
+
+            Future<void> stopBroadcast() async {
+              if (_broadcast != null) {
+                await _broadcast!.stop();
+                _isBroadcasting = false;
+                notifyListeners();
+              }
+            }
+
+            Future<void> startDiscovery({required Function(String host, int port) onServiceFound}) async {
+              try {
+                _discovery = BonsoirDiscovery(type: type);
+                await _discovery!.ready;
+                _discovery!.eventStream?.listen((event) {
+                  if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
+                    event.service?.resolve(_discovery!.serviceResolver);
+                  } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
+                    final resolvedService = event.service;
+                    if (resolvedService != null) {
+                      String? host = resolvedService.attributes['host'] ?? '127.0.0.1';
+                      onServiceFound(host, resolvedService.port);
+                    }
+                  }
+                });
+                await _discovery!.start();
+                _isDiscovering = true;
+                notifyListeners();
+              } catch (e) {
+                debugPrint('Discovery Error: \$e');
+              }
+            }
+
+            Future<void> stopDiscovery() async {
+              if (_discovery != null) {
+                await _discovery!.stop();
+                _isDiscovering = false;
+                notifyListeners();
+              }
+            }
+          }
+          EOF
           
           flutter pub get
 
       - name: Build Billing APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --dart-define=APP_ROLE=billing
+          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=billing
           cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Billing.apk
 
       - name: Build Waiter APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --dart-define=APP_ROLE=waiter
+          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=waiter
           cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Waiter.apk
 
       - name: Build Kitchen APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --dart-define=APP_ROLE=kitchen
+          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=kitchen
           cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Kitchen.apk
 
       - name: Upload All 3 APKs
@@ -70,3 +138,4 @@ jobs:
             Restaurant_Billing.apk
             Restaurant_Waiter.apk
             Restaurant_Kitchen.apk
+            
