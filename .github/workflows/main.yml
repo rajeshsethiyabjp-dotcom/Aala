@@ -22,7 +22,7 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Project, Set SDK 34 & Fix Permissions
+      - name: Prepare Project, Set SDK 36 & Fix Permissions
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
@@ -33,11 +33,12 @@ jobs:
           # 2. Add LAN / Multicast / Wi-Fi Permissions
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>' android/app/src/main/AndroidManifest.xml
           
-          # 3. Patch compileSdkVersion & targetSdkVersion to 34
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle* || true
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle* || true
-          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle* || true
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 34/g' android/app/build.gradle* || true
+          # 3. Patch compileSdk & targetSdk to 36 (for both groovy and kts)
+          find android/ -name "build.gradle*" -exec sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' {} +
+          find android/ -name "build.gradle*" -exec sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' {} +
+          find android/ -name "build.gradle*" -exec sed -i 's/compileSdk = 34/compileSdk = 36/g' {} +
+          find android/ -name "build.gradle*" -exec sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' {} +
+          find android/ -name "build.gradle*" -exec sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 34/g' {} +
           
           # 4. Patch Bonsoir API code
           python3 -c "
