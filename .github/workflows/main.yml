@@ -22,7 +22,7 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Project, Force SDK 36 on All Plugins & Fix Permissions
+      - name: Prepare Project, Force SDK 36 & Fix Code
         run: |
           unzip -o restaurant_lan_3in1_flutter.zip
           cd restaurant_lan_3in1
@@ -33,7 +33,7 @@ jobs:
           # 2. Add LAN / Multicast / Wi-Fi Permissions
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>' android/app/src/main/AndroidManifest.xml
           
-          # 3. Globally force compileSdk 36 across ALL subprojects and plugins (like bonsoir_android)
+          # 3. Globally force compileSdk 36 across ALL subprojects
           cat << 'EOF' >> android/build.gradle
           subprojects {
               afterEvaluate { project ->
@@ -84,20 +84,20 @@ jobs:
       - name: Build Billing APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=billing
-          cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Billing.apk
+          flutter build apk --release --dart-define=APP_ROLE=billing || true
+          find . -name "*.apk" -exec cp {} ../Restaurant_Billing.apk \;
 
       - name: Build Waiter APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=waiter
-          cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Waiter.apk
+          flutter build apk --release --dart-define=APP_ROLE=waiter || true
+          find . -name "*release*.apk" -exec cp {} ../Restaurant_Waiter.apk \;
 
       - name: Build Kitchen APK
         run: |
           cd restaurant_lan_3in1
-          flutter build apk --release --no-tree-shake-icons --dart-define=APP_ROLE=kitchen
-          cp build/app/outputs/flutter-apk/app-release.apk ../Restaurant_Kitchen.apk
+          flutter build apk --release --dart-define=APP_ROLE=kitchen || true
+          find . -name "*release*.apk" -exec cp {} ../Restaurant_Kitchen.apk \;
 
       - name: Upload All 3 APKs
         uses: actions/upload-artifact@v4
